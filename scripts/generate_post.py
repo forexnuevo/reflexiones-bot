@@ -271,9 +271,18 @@ def publicar_con_foto(texto, image_data):
 
 def generar_voz(texto):
     """Genera audio MP3 con gTTS (Google TTS, gratis, sin API key)"""
+    import re
     from gtts import gTTS
+    # Limpiar markdown antes de leer en voz alta
+    texto_limpio = texto
+    texto_limpio = re.sub(r'\*\*(.+?)\*\*', r'\1', texto_limpio)  # **negrita** → negrita
+    texto_limpio = re.sub(r'\*(.+?)\*', r'\1', texto_limpio)        # *italica* → italica
+    texto_limpio = re.sub(r'#{1,6}\s*', '', texto_limpio)             # ### Titulo → Titulo
+    texto_limpio = re.sub(r'\*+', '', texto_limpio)                   # asteriscos sueltos
+    texto_limpio = re.sub(r'_+', '', texto_limpio)                     # guiones bajos
+    texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()          # espacios multiples
     # Texto para audio: primeros 350 chars para que no sea muy largo
-    texto_audio = texto[:350].rsplit(' ', 1)[0] if len(texto) > 350 else texto
+    texto_audio = texto_limpio[:350].rsplit(' ', 1)[0] if len(texto_limpio) > 350 else texto_limpio
     print(f"  Generando voz para {len(texto_audio)} chars...")
     tts = gTTS(text=texto_audio, lang='es', slow=False)
     audio_path = '/tmp/audio_reflexion.mp3'
@@ -309,7 +318,7 @@ def crear_video(image_data, audio_data):
     except Exception as e:
         print(f"  No se pudo obtener duracion, usando 30s: {e}")
 
-    # ffmpeg: imagen en loop + audio → video MP4 con fade in/out
+    # ffmpeg: imagen en loop + audio â video MP4 con fade in/out
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-i', img_path,
@@ -377,7 +386,7 @@ def main():
     print(f"Imagen: {len(image_data)} bytes")
     # Alternar aleatoriamente: 50% foto, 50% video
     usar_video = random.random() < 0.5
-    print(f"Modo: {'VIDEO 🎬' if usar_video else 'FOTO 📷'}")
+    print(f"Modo: {'VIDEO ð¬' if usar_video else 'FOTO ð·'}")
 
     if usar_video:
         print("Generando voz con gTTS...")
