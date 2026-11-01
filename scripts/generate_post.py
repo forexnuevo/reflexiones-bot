@@ -122,6 +122,23 @@ def obtener_modelo_groq():
     return GROQ_MODELS[0]
 
 
+def texto_es_valido(texto):
+    """Verifica que el texto no tenga repeticiones anormales o contenido basura"""
+    if not texto or len(texto.strip()) < 100:
+        return False, "texto muy corto"
+    palabras = texto.lower().split()
+    if len(palabras) > 10:
+        from collections import Counter
+        conteo = Counter(palabras)
+        for palabra, count in conteo.items():
+            if len(palabra) <= 4 and count > 15:
+                return False, f"palabra '{palabra}' repetida {count} veces"
+        for i in range(len(palabras) - 3):
+            if palabras[i] == palabras[i+1] == palabras[i+2] == palabras[i+3]:
+                return False, f"repeticion consecutiva de '{palabras[i]}'"
+    return True, "ok"
+
+
 def generar_texto(pain_point):
     """Genera el texto del post con Groq - con auto-deteccion de modelo y reintento"""
     # Obtener lista de modelos de texto disponibles
@@ -163,8 +180,13 @@ def generar_texto(pain_point):
             content_text = response.choices[0].message.content if response.choices else None
             print(f"  finish_reason: {finish_reason}, chars: {len(content_text) if content_text else 0}")
             if content_text and content_text.strip():
-                return content_text.strip()
-            print(f"  Modelo {modelo} devolvio texto vacio, probando siguiente...")
+                texto_limpio = content_text.strip()
+                valido, razon = texto_es_valido(texto_limpio)
+                if valido:
+                    return texto_limpio
+                print(f"  Texto invalido ({razon}), probando siguiente modelo...")
+            else:
+                print(f"  Modelo {modelo} devolvio texto vacio, probando siguiente...")
         except Exception as e:
             err = str(e)[:120]
             print(f"  Error con {modelo}: {err}")
