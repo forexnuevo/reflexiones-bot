@@ -119,7 +119,7 @@ def generar_texto(pain_point):
         base_url="https://api.groq.com/openai/v1"
     )
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="openai/gpt-oss-20b",
         messages=[
             {
                 "role": "system",
