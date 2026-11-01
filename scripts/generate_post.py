@@ -28,6 +28,10 @@ REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 
 # Modelos Groq en orden de preferencia
 GROQ_MODELS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+    "allam-2-7b",
     "llama3-70b-8192",
     "llama3-8b-8192",
     "gemma2-9b-it",
@@ -36,6 +40,9 @@ GROQ_MODELS = [
     "llama-3.1-70b-versatile",
     "llama-3.1-8b-instant",
 ]
+
+# Palabras clave para EXCLUIR modelos que no sirven para texto
+SKIP_MODEL_KEYWORDS = ["whisper", "tts", "orpheus", "guard", "safeguard", "arabic", "stt", "vision", "prompt-guard"]
 
 # ============================================================
 # PAIN POINTS
@@ -81,6 +88,12 @@ def seleccionar_pain_point():
     return next(p for p in PAIN_POINTS if p["tema"] == tema_elegido)
 
 
+def es_modelo_texto(model_id):
+    """Filtra modelos que NO son para generacion de texto"""
+    low = model_id.lower()
+    return not any(kw in low for kw in SKIP_MODEL_KEYWORDS)
+
+
 def obtener_modelo_groq():
     """Detecta que modelo Groq esta disponible en esta cuenta"""
     try:
@@ -90,69 +103,76 @@ def obtener_modelo_groq():
             timeout=10
         )
         if r.ok:
-            available = [m["id"] for m in r.json().get("data", [])]
-            print(f"  Modelos Groq disponibles: {[m for m in available if 'whisper' not in m and 'tts' not in m]}")
+            all_models = [m["id"] for m in r.json().get("data", [])]
+            available = [m for m in all_models if es_modelo_texto(m)]
+            print(f"  Modelos de texto disponibles: {available}")
             for preferred in GROQ_MODELS:
                 if preferred in available:
                     print(f"  Usando modelo: {preferred}")
                     return preferred
-            # Cualquier modelo de texto
-            text_models = [m for m in available if "whisper" not in m and "tts" not in m]
-            if text_models:
-                print(f"  Usando primer modelo disponible: {text_models[0]}")
-                return text_models[0]
+            if available:
+                print(f"  Usando primer modelo de texto: {available[0]}")
+                return available[0]
+            # Si ningun modelo pasa el filtro, usar el primero de todos
+            if all_models:
+                print(f"  Fallback: {all_models[0]}")
+                return all_models[0]
     except Exception as e:
-        print(f"  Advertencia: no se pudo consultar modelos Groq: {e}")
+        print(f"  Advertencia al consultar modelos Groq: {e}")
     return GROQ_MODELS[0]
 
 
 def generar_texto(pain_point):
     """Genera el texto del post con Groq - con auto-deteccion de modelo y reintento"""
-    modelo = obtener_modelo_groq()
-    client = OpenAI(
-        api_key=GROQ_API_KEY,
-        base_url="https://api.groq.com/openai/v1"
-    )
+    # Obtener lista de modelos de texto disponibles
+    try:
+        r = requests.get(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            timeout=10
+        )
+        all_models = [m["id"] for m in r.json().get("data", [])] if r.ok else []
+        text_models = [m for m in all_models if es_modelo_texto(m)]
+        # Ordenar por preferencia
+        ordered = [m for m in GROQ_MODELS if m in text_models]
+        ordered += [m for m in text_models if m not in ordered]
+        modelos_a_probar = ordered if ordered else GROQ_MODELS[:3]
+    except:
+        modelos_a_probar = GROQ_MODELS[:3]
 
+    print(f"  Modelos a probar: {modelos_a_probar}")
+    client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
     prompt = pain_point["prompt_texto"]
 
-    for intento in range(3):
+    for modelo in modelos_a_probar:
         try:
-            print(f"  Intento {intento+1} con modelo {modelo}...")
+            print(f"  Probando modelo: {modelo}...")
             response = client.chat.completions.create(
                 model=modelo,
                 messages=[
                     {
                         "role": "system",
-                        "content": "Eres un escritor cristiano que crea contenido espiritual autentico y emotivo en espanol para Facebook. Escribe en parrafos naturales, sin hashtags, con corazon genuino."
+                        "content": "Eres un escritor cristiano que crea contenido espiritual autentico y emotivo en espanol para Facebook. Escribe en parrafos naturales, sin hashtags."
                     },
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=500,
                 temperature=0.8
             )
-
-            finish_reason = response.choices[0].finish_reason if response.choices else "unknown"
-            content = response.choices[0].message.content if response.choices else None
-            print(f"  finish_reason: {finish_reason}, content_length: {len(content) if content else 0}")
-
-            if content and content.strip():
-                return content.strip()
-            else:
-                print(f"  Respuesta vacia en intento {intento+1}, reintentando...")
-                time.sleep(2)
+            finish_reason = response.choices[0].finish_reason if response.choices else "none"
+            content_text = response.choices[0].message.content if response.choices else None
+            print(f"  finish_reason: {finish_reason}, chars: {len(content_text) if content_text else 0}")
+            if content_text and content_text.strip():
+                return content_text.strip()
+            print(f"  Modelo {modelo} devolvio texto vacio, probando siguiente...")
         except Exception as e:
-            err_str = str(e)
-            print(f"  Error en intento {intento+1}: {err_str[:100]}")
-            # Si es error de modelo no encontrado, probar siguiente
-            if "does not exist" in err_str or "404" in err_str:
-                idx = GROQ_MODELS.index(modelo) if modelo in GROQ_MODELS else -1
-                if idx >= 0 and idx + 1 < len(GROQ_MODELS):
-                    modelo = GROQ_MODELS[idx + 1]
-                    print(f"  Cambiando a modelo: {modelo}")
-            time.sleep(2)
+            err = str(e)[:120]
+            print(f"  Error con {modelo}: {err}")
+            if "terms" in err.lower() or "terms acceptance" in err.lower():
+                print(f"  -> Modelo requiere aceptar terminos, saltando...")
+            # Try next model regardless
 
-    raise Exception("No se pudo generar texto despues de 3 intentos")
+    raise Exception(f"No se pudo generar texto con ninguno de los modelos: {modelos_a_probar}")
 
 
 def generar_imagen(image_prompt):
