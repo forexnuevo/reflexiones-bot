@@ -228,7 +228,7 @@ ESCENAS_RELIGIOSAS = [
     "Aurora borealis (northern lights) in brilliant green and purple over a snowy landscape, divine beauty, stunning photography",
     "A full moon rising over a calm sea, golden path on water, peaceful and contemplative, night photography",
     "Dramatic cumulus clouds forming a cathedral-like arch in the sky, sun rays breaking through, epic sky photography",
-    # SÃ­mbolos religiosos
+    # SÃÂ­mbolos religiosos
     "An ornate golden cross in an ancient cathedral with light streaming through rose windows, sacred architecture, wide angle photography",
     "Open Bible on a rustic wooden surface with a small plant growing nearby, new life and scripture, still life photography",
     "A rosary laid on an old stone surface with a single flower, delicate and devotional, macro photography, warm tones",
@@ -319,24 +319,63 @@ def limpiar_para_voz(texto):
     """Elimina todos los simbolos de markdown y formato para que gTTS lea correctamente"""
     import re
     t = texto
-    t = re.sub(r'\*\*(.+?)\*\*', r'\1', t)   # **negrita** -> negrita
-    t = re.sub(r'\*(.+?)\*', r'\1', t)          # *italica* -> italica
-    t = re.sub(r'^#{1,6}\s*', '', t, flags=re.MULTILINE)  # ### titulo -> titulo
-    t = re.sub(r'^>+\s*', '', t, flags=re.MULTILINE)      # > cita -> cita
-    t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)  # [texto](url) -> texto
-    t = re.sub(r'<[^>]+>', '', t)                  # <etiquetas> -> eliminar
-    t = re.sub(r'[*_~`#>|\\]', '', t)           # simbolos sueltos restantes
-    t = re.sub(r'\s+', ' ', t).strip()            # espacios multiples
+    t = re.sub(r'\*\*(.+?)\*\*', r'\1', t)
+    t = re.sub(r'\*(.+?)\*', r'\1', t)
+    t = re.sub(r'^#{1,6}\s*', '', t, flags=re.MULTILINE)
+    t = re.sub(r'^>+\s*', '', t, flags=re.MULTILINE)
+    t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
+    t = re.sub(r'<[^>]+>', '', t)
+    t = re.sub(r'[*_~`#>|\\]', '', t)
+    t = re.sub(r'\s+', ' ', t).strip()
     return t
 
 
 def generar_voz(texto):
-    """Genera audio MP3 con gTTS (Google TTS, gratis, sin API key)"""
+    """Genera audio MP3 con gTTS. Lee el texto completo hasta 650 chars
+    cortando en punto o coma, y agrega CTA aleatorio al final."""
+    import random
     from gtts import gTTS
+
+    CTAS = [
+        "Síguenos para recibir más reflexiones como esta cada día.",
+        "Si esto tocó tu corazón, dale me gusta y compártelo con alguien especial.",
+        "Deja un amén en los comentarios si crees en el poder de Dios.",
+        "Síguenos y recibe cada día una palabra de esperanza.",
+        "Comenta lo que sientes. Tu testimonio puede cambiar la vida de alguien.",
+        "Comparte esta reflexión. Tal vez alguien la necesita hoy.",
+        "Dale me gusta si Dios ha sido fiel en tu vida.",
+        "Síguenos para más mensajes de fe, esperanza y amor.",
+        "Escribe amén si recibiste esta bendición en tu corazón.",
+        "Comparte con tu familia. La fe se fortalece juntos.",
+    ]
+
     texto_limpio = limpiar_para_voz(texto)
-    texto_audio = texto_limpio[:400].rsplit(' ', 1)[0] if len(texto_limpio) > 400 else texto_limpio
-    print(f"  Texto para voz ({len(texto_audio)} chars): {texto_audio[:80]}...")
-    tts = gTTS(text=texto_audio, lang='es', slow=False)
+
+    # Cortar en un punto o signo de cierre cerca del limite, no a mitad de frase
+    limite = 650
+    if len(texto_limpio) > limite:
+        # Buscar ultimo punto o signo de cierre antes del limite
+        corte = texto_limpio.rfind('.', 0, limite)
+        if corte == -1:
+            corte = texto_limpio.rfind('!', 0, limite)
+        if corte == -1:
+            corte = texto_limpio.rfind('?', 0, limite)
+        if corte == -1:
+            corte = texto_limpio.rfind(',', 0, limite)
+        if corte > 100:
+            texto_audio = texto_limpio[:corte + 1]
+        else:
+            texto_audio = texto_limpio[:limite]
+    else:
+        texto_audio = texto_limpio
+
+    # Agregar CTA aleatorio
+    cta = random.choice(CTAS)
+    texto_final = texto_audio.strip() + " " + cta
+
+    print(f"  Texto para voz ({len(texto_final)} chars)")
+    print(f"  CTA: {cta}")
+    tts = gTTS(text=texto_final, lang='es', slow=False)
     audio_path = '/tmp/audio_reflexion.mp3'
     tts.save(audio_path)
     with open(audio_path, 'rb') as f:
@@ -369,7 +408,7 @@ def crear_video(image_data, audio_data):
     except Exception as e:
         print(f"  No se pudo obtener duracion, usando 30s: {e}")
 
-    # ffmpeg: imagen en loop + audio ÃÂ¢ÃÂÃÂ video MP4 con fade in/out
+    # ffmpeg: imagen en loop + audio ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ video MP4 con fade in/out
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-i', img_path,
@@ -437,7 +476,7 @@ def main():
     print(f"Imagen: {len(image_data)} bytes")
     # Alternar aleatoriamente: 50% foto, 50% video
     usar_video = random.random() < 0.5
-    print(f"Modo: {'VIDEO ÃÂ°ÃÂÃÂÃÂ¬' if usar_video else 'FOTO ÃÂ°ÃÂÃÂÃÂ·'}")
+    print(f"Modo: {'VIDEO ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ¬' if usar_video else 'FOTO ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ·'}")
 
     if usar_video:
         print("Generando voz con gTTS...")
