@@ -1,4 +1,4 @@
-name: "🙏 Post Automático - Reflexiones Religiosas"
+name: Post Automatico Reflexiones Religiosas
 
 on:
   schedule:
@@ -8,27 +8,21 @@ on:
   workflow_dispatch:
     inputs:
       tema:
-        description: 'Tema (opcional)'
+        description: 'Tema opcional'
         required: false
         default: 'aleatorio'
 
 jobs:
   publicar:
-    name: Generar y Publicar Post
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: "📥 Descargar código"
-        uses: actions/checkout@v4
-      - name: "🐍 Configurar Python 3.11"
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: "📦 Instalar dependencias"
-        run: |
-          pip install --upgrade pip
-          pip install openai replicate requests
-      - name: "🙏 Generar y publicar post"
+      - run: pip install --upgrade pip && pip install openai replicate requests
+      - name: Generar y publicar post
         env:
           FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
