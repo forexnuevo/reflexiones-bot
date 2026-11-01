@@ -228,7 +228,7 @@ ESCENAS_RELIGIOSAS = [
     "Aurora borealis (northern lights) in brilliant green and purple over a snowy landscape, divine beauty, stunning photography",
     "A full moon rising over a calm sea, golden path on water, peaceful and contemplative, night photography",
     "Dramatic cumulus clouds forming a cathedral-like arch in the sky, sun rays breaking through, epic sky photography",
-    # Símbolos religiosos
+    # SÃ­mbolos religiosos
     "An ornate golden cross in an ancient cathedral with light streaming through rose windows, sacred architecture, wide angle photography",
     "Open Bible on a rustic wooden surface with a small plant growing nearby, new life and scripture, still life photography",
     "A rosary laid on an old stone surface with a single flower, delicate and devotional, macro photography, warm tones",
@@ -315,21 +315,27 @@ def publicar_con_foto(texto, image_data):
 
 
 
+def limpiar_para_voz(texto):
+    """Elimina todos los simbolos de markdown y formato para que gTTS lea correctamente"""
+    import re
+    t = texto
+    t = re.sub(r'\*\*(.+?)\*\*', r'\1', t)   # **negrita** -> negrita
+    t = re.sub(r'\*(.+?)\*', r'\1', t)          # *italica* -> italica
+    t = re.sub(r'^#{1,6}\s*', '', t, flags=re.MULTILINE)  # ### titulo -> titulo
+    t = re.sub(r'^>+\s*', '', t, flags=re.MULTILINE)      # > cita -> cita
+    t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)  # [texto](url) -> texto
+    t = re.sub(r'<[^>]+>', '', t)                  # <etiquetas> -> eliminar
+    t = re.sub(r'[*_~`#>|\\]', '', t)           # simbolos sueltos restantes
+    t = re.sub(r'\s+', ' ', t).strip()            # espacios multiples
+    return t
+
+
 def generar_voz(texto):
     """Genera audio MP3 con gTTS (Google TTS, gratis, sin API key)"""
-    import re
     from gtts import gTTS
-    # Limpiar markdown antes de leer en voz alta
-    texto_limpio = texto
-    texto_limpio = re.sub(r'\*\*(.+?)\*\*', r'\1', texto_limpio)  # **negrita** â negrita
-    texto_limpio = re.sub(r'\*(.+?)\*', r'\1', texto_limpio)        # *italica* â italica
-    texto_limpio = re.sub(r'#{1,6}\s*', '', texto_limpio)             # ### Titulo â Titulo
-    texto_limpio = re.sub(r'\*+', '', texto_limpio)                   # asteriscos sueltos
-    texto_limpio = re.sub(r'_+', '', texto_limpio)                     # guiones bajos
-    texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()          # espacios multiples
-    # Texto para audio: primeros 350 chars para que no sea muy largo
-    texto_audio = texto_limpio[:350].rsplit(' ', 1)[0] if len(texto_limpio) > 350 else texto_limpio
-    print(f"  Generando voz para {len(texto_audio)} chars...")
+    texto_limpio = limpiar_para_voz(texto)
+    texto_audio = texto_limpio[:400].rsplit(' ', 1)[0] if len(texto_limpio) > 400 else texto_limpio
+    print(f"  Texto para voz ({len(texto_audio)} chars): {texto_audio[:80]}...")
     tts = gTTS(text=texto_audio, lang='es', slow=False)
     audio_path = '/tmp/audio_reflexion.mp3'
     tts.save(audio_path)
@@ -337,7 +343,6 @@ def generar_voz(texto):
         data = f.read()
     print(f"  Audio generado: {len(data)} bytes")
     return data
-
 
 def crear_video(image_data, audio_data):
     """Combina imagen + audio con ffmpeg para crear video MP4"""
@@ -364,7 +369,7 @@ def crear_video(image_data, audio_data):
     except Exception as e:
         print(f"  No se pudo obtener duracion, usando 30s: {e}")
 
-    # ffmpeg: imagen en loop + audio Ã¢ÂÂ video MP4 con fade in/out
+    # ffmpeg: imagen en loop + audio ÃÂ¢ÃÂÃÂ video MP4 con fade in/out
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-i', img_path,
@@ -432,7 +437,7 @@ def main():
     print(f"Imagen: {len(image_data)} bytes")
     # Alternar aleatoriamente: 50% foto, 50% video
     usar_video = random.random() < 0.5
-    print(f"Modo: {'VIDEO Ã°ÂÂÂ¬' if usar_video else 'FOTO Ã°ÂÂÂ·'}")
+    print(f"Modo: {'VIDEO ÃÂ°ÃÂÃÂÃÂ¬' if usar_video else 'FOTO ÃÂ°ÃÂÃÂÃÂ·'}")
 
     if usar_video:
         print("Generando voz con gTTS...")
