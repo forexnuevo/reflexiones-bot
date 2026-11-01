@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generador automatico de posts para Facebook - Reflexiones Religiosas
-Usa Groq (GRATIS) para texto + Replicate para imagenes + Facebook Graph API para publicar
+Usa Groq (GRATIS) para texto + Replicate REST API para imagenes + Facebook Graph API para publicar
 """
 
 import os
@@ -9,6 +9,7 @@ import random
 import requests
 import json
 import sys
+import time
 from datetime import datetime
 
 try:
@@ -17,13 +18,6 @@ except ImportError:
     print("Instalando openai...")
     os.system("pip install openai --quiet")
     from openai import OpenAI
-
-try:
-    import replicate
-except ImportError:
-    print("Instalando replicate...")
-    os.system("pip install replicate --quiet")
-    import replicate
 
 # ============================================================
 # CONFIGURACION
@@ -34,7 +28,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN")
 
 # ============================================================
-# PAIN POINTS - Los 5 temas que mas mueven al publico religioso
+# PAIN POINTS
 # ============================================================
 PAIN_POINTS = [
     {
@@ -119,7 +113,7 @@ def generar_texto(pain_point):
         base_url="https://api.groq.com/openai/v1"
     )
     response = client.chat.completions.create(
-        model="openai/gpt-oss-20b",
+        model="llama-3.3-70b-versatile",
         messages=[
             {
                 "role": "system",
@@ -136,15 +130,22 @@ def generar_texto(pain_point):
         max_tokens=700,
         temperature=0.85
     )
-    return response.choices[0].message.content.strip()
+    texto = response.choices[0].message.content.strip()
+    if not texto:
+        raise Exception("Groq devolvio texto vacio")
+    return texto
 
 
 def generar_imagen(image_prompt):
-    """Genera imagen con Replicate usando flux-schnell"""
-    os.environ["REPLICATE_API_TOKEN"] = REPLICATE_API_TOKEN
-    output = replicate.run(
-        "black-forest-labs/flux-schnell",
-        input={
+    """Genera imagen con Replicate usando REST API directamente (sin SDK)"""
+    headers = {
+        "Authorization": f"Bearer {REPLICATE_API_TOKEN}",
+        "Content-Type": "application/json",
+        "Prefer": "wait=60"
+    }
+
+    payload = {
+        "input": {
             "prompt": image_prompt,
             "num_outputs": 1,
             "output_format": "webp",
@@ -152,8 +153,47 @@ def generar_imagen(image_prompt):
             "width": 1080,
             "height": 1080
         }
+    }
+
+    print("  Enviando solicitud a Replicate...")
+    r = requests.post(
+        "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions",
+        headers=headers,
+        json=payload,
+        timeout=120
     )
-    image_url = str(output[0])
+
+    if r.status_code not in (200, 201):
+        raise Exception(f"Replicate HTTP {r.status_code}: {r.text}")
+
+    result = r.json()
+
+    # Esperar si no esta listo
+    max_attempts = 30
+    attempt = 0
+    while result.get("status") not in ("succeeded", "failed", "canceled") and attempt < max_attempts:
+        pred_id = result.get("id")
+        if not pred_id:
+            raise Exception(f"Sin prediction ID: {result}")
+        print(f"  Estado: {result.get('status')} - esperando...")
+        time.sleep(3)
+        poll = requests.get(
+            f"https://api.replicate.com/v1/predictions/{pred_id}",
+            headers={"Authorization": f"Bearer {REPLICATE_API_TOKEN}"},
+            timeout=30
+        )
+        result = poll.json()
+        attempt += 1
+
+    if result.get("status") == "failed":
+        raise Exception(f"Replicate fallo: {result.get('error')}")
+
+    output = result.get("output")
+    if not output:
+        raise Exception(f"Sin output de Replicate: {result}")
+
+    image_url = output[0] if isinstance(output, list) else str(output)
+    print(f"  Imagen generada: {image_url[:80]}...")
     response = requests.get(image_url, timeout=60)
     response.raise_for_status()
     return response.content, image_url
@@ -207,9 +247,9 @@ def main():
     texto = generar_texto(pain_point)
     print(f"Texto generado ({len(texto)} caracteres)")
     print(f"\n--- PREVIEW ---\n{texto[:200]}...\n")
-    print("Generando imagen con Replicate...")
+    print("Generando imagen con Replicate (REST API)...")
     image_data, image_url = generar_imagen(pain_point["prompt_imagen"])
-    print(f"Imagen generada: {image_url}")
+    print(f"Imagen OK - {len(image_data)} bytes")
     print("Subiendo imagen a Facebook...")
     photo_id = subir_imagen_facebook(image_data)
     print(f"Imagen subida, ID: {photo_id}")
@@ -217,12 +257,13 @@ def main():
     result = publicar_post(texto, photo_id)
     if 'id' in result:
         post_id = result['id']
-        print(f"\nPOST PUBLICADO EXITOSAMENTE!")
+        print(f"\n{'='*50}")
+        print(f"POST PUBLICADO EXITOSAMENTE!")
         print(f"Post ID: {post_id}")
+        print(f"{'='*50}\n")
     else:
         print(f"\nError publicando post: {result}")
         sys.exit(1)
-    print(f"\n{'='*50}\n")
 
 
 if __name__ == "__main__":
