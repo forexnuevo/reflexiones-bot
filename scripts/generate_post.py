@@ -228,7 +228,7 @@ ESCENAS_RELIGIOSAS = [
     "Aurora borealis (northern lights) in brilliant green and purple over a snowy landscape, divine beauty, stunning photography",
     "A full moon rising over a calm sea, golden path on water, peaceful and contemplative, night photography",
     "Dramatic cumulus clouds forming a cathedral-like arch in the sky, sun rays breaking through, epic sky photography",
-    # SÃÂÃÂ­mbolos religiosos
+    # SÃÂÃÂÃÂÃÂ­mbolos religiosos
     "An ornate golden cross in an ancient cathedral with light streaming through rose windows, sacred architecture, wide angle photography",
     "Open Bible on a rustic wooden surface with a small plant growing nearby, new life and scripture, still life photography",
     "A rosary laid on an old stone surface with a single flower, delicate and devotional, macro photography, warm tones",
@@ -330,28 +330,27 @@ def limpiar_para_voz(texto):
 
 
 def generar_voz(texto):
-    """Genera audio natural dividiendo en frases y uniendo con ffmpeg.
-    Cada frase se genera por separado para evitar cortes y pausas artificiales."""
-    import re, random, subprocess, os, tempfile
+    """Genera audio MP3 con gTTS - metodo simple y estable."""
+    import random
     from gtts import gTTS
 
     CTAS = [
-        "Síguenos para recibir más reflexiones como esta cada día.",
-        "Si esto tocó tu corazón, dale me gusta y compártelo con alguien especial.",
-        "Deja un amén en los comentarios si crees en el poder de Dios.",
-        "Síguenos y recibe cada día una palabra de esperanza.",
+        "Siguenos para recibir mas reflexiones como esta cada dia.",
+        "Si esto toco tu corazon, dale me gusta y compartelo con alguien especial.",
+        "Deja un amen en los comentarios si crees en el poder de Dios.",
+        "Siguenos y recibe cada dia una palabra de esperanza.",
         "Comenta lo que sientes. Tu testimonio puede cambiar la vida de alguien.",
-        "Comparte esta reflexión. Tal vez alguien la necesita hoy.",
+        "Comparte esta reflexion. Tal vez alguien la necesita hoy.",
         "Dale me gusta si Dios ha sido fiel en tu vida.",
-        "Síguenos para más mensajes de fe, esperanza y amor.",
-        "Escribe amén si recibiste esta bendición en tu corazón.",
+        "Siguenos para mas mensajes de fe, esperanza y amor.",
+        "Escribe amen si recibiste esta bendicion en tu corazon.",
         "Comparte con tu familia. La fe se fortalece juntos.",
     ]
 
     texto_limpio = limpiar_para_voz(texto)
 
-    # Cortar en punto final cerca del limite para no dejar frase incompleta
-    limite = 650
+    # Cortar en punto final cerca del limite
+    limite = 600
     if len(texto_limpio) > limite:
         for sep in ['.', '!', '?', ',']:
             corte = texto_limpio.rfind(sep, 0, limite)
@@ -359,80 +358,17 @@ def generar_voz(texto):
                 texto_limpio = texto_limpio[:corte + 1]
                 break
 
-    # Agregar CTA aleatorio
     cta = random.choice(CTAS)
     texto_final = texto_limpio.strip() + " " + cta
-    print(f"  Texto para voz: {len(texto_final)} chars")
+    print(f"  Generando voz: {len(texto_final)} chars")
     print(f"  CTA: {cta}")
 
-    # Dividir en frases por punto, signo de exclamacion o interrogacion
-    # Mantener el signo al final de cada frase
-    frases = re.split(r'(?<=[.!?])\s+', texto_final)
-    frases = [f.strip() for f in frases if f.strip() and len(f.strip()) > 3]
-    print(f"  Frases: {len(frases)}")
-
-    if len(frases) <= 1:
-        # Texto corto: generar de una sola vez
-        tts = gTTS(text=texto_final, lang='es', slow=False)
-        audio_path = '/tmp/audio_reflexion.mp3'
-        tts.save(audio_path)
-        with open(audio_path, 'rb') as f:
-            return f.read()
-
-    # Generar cada frase por separado y unir con ffmpeg
-    archivos = []
-    tmpdir = '/tmp/frases_audio'
-    os.makedirs(tmpdir, exist_ok=True)
-
-    for i, frase in enumerate(frases):
-        path = f'{tmpdir}/frase_{i:02d}.mp3'
-        try:
-            tts = gTTS(text=frase, lang='es', slow=False)
-            tts.save(path)
-            archivos.append(path)
-        except Exception as e:
-            print(f"  Error en frase {i}: {e}")
-
-    if not archivos:
-        raise Exception("No se generaron frases de audio")
-
-    if len(archivos) == 1:
-        with open(archivos[0], 'rb') as f:
-            return f.read()
-
-    # Crear archivo de silencio de 0.25s entre frases
-    silencio = f'{tmpdir}/silencio.mp3'
-    subprocess.run([
-        'ffmpeg', '-y', '-f', 'lavfi', '-i',
-        'anullsrc=channel_layout=mono:sample_rate=24000',
-        '-t', '0.25', '-q:a', '9', '-acodec', 'libmp3lame', silencio
-    ], capture_output=True)
-
-    # Construir lista de archivos para concatenar (frase, silencio, frase, silencio...)
-    concat_list = f'{tmpdir}/concat.txt'
-    with open(concat_list, 'w') as f:
-        for j, arch in enumerate(archivos):
-            f.write(f"file '{arch}'\n")
-            if j < len(archivos) - 1:
-                f.write(f"file '{silencio}'\n")
-
-    output_path = '/tmp/audio_reflexion.mp3'
-    result = subprocess.run([
-        'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
-        '-i', concat_list,
-        '-acodec', 'libmp3lame', '-q:a', '4',
-        output_path
-    ], capture_output=True, text=True)
-
-    if result.returncode != 0:
-        # Fallback: usar solo la primera frase completa
-        print(f"  ffmpeg concat error, usando frase completa: {result.stderr[-200:]}")
-        tts = gTTS(text=texto_final[:400], lang='es', slow=False)
-        tts.save(output_path)
-
-    with open(output_path, 'rb') as f:
+    tts = gTTS(text=texto_final, lang='es', slow=False)
+    audio_path = '/tmp/audio_reflexion.mp3'
+    tts.save(audio_path)
+    with open(audio_path, 'rb') as f:
         data = f.read()
-    print(f"  Audio final: {len(data)} bytes ({len(archivos)} frases)")
+    print(f"  Audio: {len(data)} bytes")
     return data
 
 def crear_video(image_data, audio_data):
@@ -460,7 +396,7 @@ def crear_video(image_data, audio_data):
     except Exception as e:
         print(f"  No se pudo obtener duracion, usando 30s: {e}")
 
-    # ffmpeg: imagen en loop + audio ÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ video MP4 con fade in/out
+    # ffmpeg: imagen en loop + audio ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ video MP4 con fade in/out
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-i', img_path,
@@ -528,7 +464,7 @@ def main():
     print(f"Imagen: {len(image_data)} bytes")
     # Alternar aleatoriamente: 50% foto, 50% video
     usar_video = random.random() < 0.5
-    print(f"Modo: {'VIDEO ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬' if usar_video else 'FOTO ÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·'}")
+    print(f"Modo: {'VIDEO ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¬' if usar_video else 'FOTO ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ·'}")
 
     if usar_video:
         print("Generando voz con gTTS...")
