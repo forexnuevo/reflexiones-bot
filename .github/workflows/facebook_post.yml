@@ -1,0 +1,53 @@
+name: 🙏 Post Automático - Reflexiones Religiosas
+
+on:
+  schedule:
+    # 3 posts por día: 9am, 1pm, 7pm hora Colombia/Bogotá (UTC-5)
+    # En UTC: 14:00, 18:00, 00:00
+    - cron: '0 14 * * *'   # 9am Bogotá
+    - cron: '0 18 * * *'   # 1pm Bogotá
+    - cron: '0 0 * * *'    # 7pm Bogotá
+
+  # También puedes lanzarlo manualmente desde GitHub
+  workflow_dispatch:
+    inputs:
+      tema:
+        description: 'Tema específico (opcional): soledad, familia_en_crisis, dificultades_economicas, duelo_y_perdida, abandono_espiritual'
+        required: false
+        default: 'aleatorio'
+
+jobs:
+  publicar:
+    name: Generar y Publicar Post
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Descargar código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install openai replicate requests
+
+      - name: 🙏 Generar y publicar post
+        env:
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+        run: |
+          python scripts/generate_post.py
+
+      - name: ✅ Confirmar publicación
+        if: success()
+        run: echo "Post publicado exitosamente en Facebook!"
+
+      - name: ❌ Notificar error
+        if: failure()
+        run: echo "ERROR: No se pudo publicar el post. Revisar logs arriba."
