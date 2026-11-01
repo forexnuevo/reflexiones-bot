@@ -213,23 +213,16 @@ def generar_imagen(image_prompt):
     return resp.content, image_url
 
 
-def subir_imagen_facebook(image_data):
+def publicar_con_foto(texto, image_data):
+    """Publica texto + imagen en una sola llamada a /photos (mas simple, sin permisos extra)"""
     url = f"https://graph.facebook.com/v20.0/{PAGE_ID}/photos"
     files = {"source": ("image.webp", image_data, "image/webp")}
-    data = {"access_token": PAGE_ACCESS_TOKEN, "published": "false"}
+    data = {
+        "access_token": PAGE_ACCESS_TOKEN,
+        "message": texto,
+        "published": "true"
+    }
     response = requests.post(url, files=files, data=data, timeout=60)
-    result = response.json()
-    if "id" in result:
-        return result["id"]
-    raise Exception(f"Error subiendo imagen: {result}")
-
-
-def publicar_post(texto, photo_id=None):
-    url = f"https://graph.facebook.com/v20.0/{PAGE_ID}/feed"
-    data = {"message": texto, "access_token": PAGE_ACCESS_TOKEN}
-    if photo_id:
-        data["attached_media"] = json.dumps([{"media_fbid": photo_id}])
-    response = requests.post(url, data=data, timeout=30)
     return response.json()
 
 
@@ -262,17 +255,15 @@ def main():
     print("Generando imagen con Replicate...")
     image_data, image_url = generar_imagen(pain_point["prompt_imagen"])
     print(f"Imagen: {len(image_data)} bytes")
-    print("Subiendo imagen a Facebook...")
-    photo_id = subir_imagen_facebook(image_data)
-    print(f"Foto subida: {photo_id}")
-    print("Publicando post...")
-    result = publicar_post(texto, photo_id)
-    if "id" in result:
+    print("Publicando post con imagen en Facebook...")
+    result = publicar_con_foto(texto, image_data)
+    if "id" in result or "post_id" in result:
+        post_id = result.get("id") or result.get("post_id")
         print(f"\n{'='*50}")
-        print(f"POST PUBLICADO! ID: {result['id']}")
+        print(f"POST PUBLICADO! ID: {post_id}")
         print(f"{'='*50}\n")
     else:
-        print(f"Error: {result}")
+        print(f"Error Facebook: {result}")
         sys.exit(1)
 
 
