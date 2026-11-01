@@ -268,6 +268,84 @@ def publicar_con_foto(texto, image_data):
     return response.json()
 
 
+
+def generar_voz(texto):
+    """Genera audio MP3 con gTTS (Google TTS, gratis, sin API key)"""
+    from gtts import gTTS
+    # Texto para audio: primeros 350 chars para que no sea muy largo
+    texto_audio = texto[:350].rsplit(' ', 1)[0] if len(texto) > 350 else texto
+    print(f"  Generando voz para {len(texto_audio)} chars...")
+    tts = gTTS(text=texto_audio, lang='es', slow=False)
+    audio_path = '/tmp/audio_reflexion.mp3'
+    tts.save(audio_path)
+    with open(audio_path, 'rb') as f:
+        data = f.read()
+    print(f"  Audio generado: {len(data)} bytes")
+    return data
+
+
+def crear_video(image_data, audio_data):
+    """Combina imagen + audio con ffmpeg para crear video MP4"""
+    import subprocess, json
+    img_path = '/tmp/img_reflexion.webp'
+    audio_path = '/tmp/audio_reflexion.mp3'
+    output_path = '/tmp/video_reflexion.mp4'
+
+    with open(img_path, 'wb') as f:
+        f.write(image_data)
+    with open(audio_path, 'wb') as f:
+        f.write(audio_data)
+
+    # Obtener duracion del audio
+    duration = 30
+    try:
+        r = subprocess.run(
+            ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', audio_path],
+            capture_output=True, text=True
+        )
+        info = json.loads(r.stdout)
+        duration = float(info['format']['duration']) + 0.5
+        print(f"  Duracion audio: {duration:.1f}s")
+    except Exception as e:
+        print(f"  No se pudo obtener duracion, usando 30s: {e}")
+
+    # ffmpeg: imagen en loop + audio → video MP4 con fade in/out
+    cmd = [
+        'ffmpeg', '-y',
+        '-loop', '1', '-i', img_path,
+        '-i', audio_path,
+        '-c:v', 'libx264', '-preset', 'fast',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-pix_fmt', 'yuv420p',
+        '-vf', f'scale=1080:1080,fade=t=in:st=0:d=0.5,fade=t=out:st={max(duration-1,duration-1):.1f}:d=0.5',
+        '-shortest',
+        '-t', str(duration),
+        output_path
+    ]
+    print("  Creando video con ffmpeg...")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(f"ffmpeg error: {result.stderr[-300:]}")
+
+    with open(output_path, 'rb') as f:
+        video_data = f.read()
+    print(f"  Video creado: {len(video_data)} bytes ({duration:.1f}s)")
+    return video_data
+
+
+def publicar_video(texto, video_data):
+    """Publica video en la pagina de Facebook"""
+    url = f"https://graph.facebook.com/v20.0/{PAGE_ID}/videos"
+    files = {"source": ("video.mp4", video_data, "video/mp4")}
+    data = {
+        "access_token": PAGE_ACCESS_TOKEN,
+        "description": texto,
+        "published": "true"
+    }
+    print("  Subiendo video a Facebook (puede tardar)...")
+    response = requests.post(url, files=files, data=data, timeout=180)
+    return response.json()
+
 def verificar_config():
     errores = []
     if not PAGE_ACCESS_TOKEN:
@@ -297,16 +375,42 @@ def main():
     print("Generando imagen con Replicate...")
     image_data, image_url = generar_imagen(pain_point["prompt_imagen"])
     print(f"Imagen: {len(image_data)} bytes")
-    print("Publicando post con imagen en Facebook...")
-    result = publicar_con_foto(texto, image_data)
-    if "id" in result or "post_id" in result:
-        post_id = result.get("id") or result.get("post_id")
-        print(f"\n{'='*50}")
-        print(f"POST PUBLICADO! ID: {post_id}")
-        print(f"{'='*50}\n")
+    # Alternar aleatoriamente: 50% foto, 50% video
+    usar_video = random.random() < 0.5
+    print(f"Modo: {'VIDEO 🎬' if usar_video else 'FOTO 📷'}")
+
+    if usar_video:
+        print("Generando voz con gTTS...")
+        audio_data = generar_voz(texto)
+        print("Creando video con ffmpeg...")
+        video_data = crear_video(image_data, audio_data)
+        print(f"Video: {len(video_data)} bytes")
+        result = publicar_video(texto, video_data)
+        if "id" in result:
+            print(f"\n{'='*50}")
+            print(f"VIDEO PUBLICADO! ID: {result['id']}")
+            print(f"{'='*50}\n")
+        else:
+            print(f"Error video Facebook: {result}")
+            print("Intentando publicar como foto...")
+            result = publicar_con_foto(texto, image_data)
+            if "id" in result or "post_id" in result:
+                post_id = result.get("id") or result.get("post_id")
+                print(f"FOTO PUBLICADA como fallback! ID: {post_id}")
+            else:
+                print(f"Error Facebook: {result}")
+                sys.exit(1)
     else:
-        print(f"Error Facebook: {result}")
-        sys.exit(1)
+        print("Publicando post con imagen en Facebook...")
+        result = publicar_con_foto(texto, image_data)
+        if "id" in result or "post_id" in result:
+            post_id = result.get("id") or result.get("post_id")
+            print(f"\n{'='*50}")
+            print(f"FOTO PUBLICADA! ID: {post_id}")
+            print(f"{'='*50}\n")
+        else:
+            print(f"Error Facebook: {result}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
