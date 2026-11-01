@@ -197,6 +197,52 @@ def generar_texto(pain_point):
     raise Exception(f"No se pudo generar texto con ninguno de los modelos: {modelos_a_probar}")
 
 
+
+ESCENAS_RELIGIOSAS = [
+    # Naturaleza y luz divina
+    "A person kneeling in prayer on a cliff overlooking a vast ocean at golden hour, rays of sunlight breaking through clouds, cinematic, photorealistic, 8k, dramatic lighting",
+    "A lone figure standing in a field of wheat at sunrise, arms outstretched toward heaven, golden light flooding the scene, cinematic photography, award-winning",
+    "Ancient stone church surrounded by cherry blossom trees in full bloom at dawn, soft pink and golden light, ethereal atmosphere, photorealistic 8k",
+    "Silhouette of a person praying on a hilltop against a breathtaking sunset with purple and orange clouds, dramatic cinematic photography",
+    "A wooden cross on a mountaintop at sunrise, rays of light emanating from behind it, fog in the valley below, epic landscape photography",
+    "Hands holding an open Bible on a wooden table near a window with morning sunlight streaming in, dust particles in light, macro photography, warm tones",
+    "A candle burning in a dark chapel with stained glass windows casting colorful light, intimate and peaceful, cinematic photography",
+    "A white dove in flight against a golden sunset sky, wings spread wide, freedom and peace, stunning wildlife photography",
+    "Ancient olive trees in a garden at dawn with soft mist, reminiscent of Gethsemane, atmospheric photography, peaceful",
+    "A river flowing through a lush green valley with light breaking through storm clouds above, hope after rain, cinematic landscape",
+    # Familia y comunidad
+    "A family holding hands in prayer around a dinner table, warm candlelight, joy and gratitude on their faces, cinematic family photography",
+    "An elderly woman with her hands clasped in prayer, face radiating peace and wisdom, close-up portrait, beautiful natural light",
+    "A young child looking up at the sky in wonder, sunbeams falling on face, innocent and pure, golden hour portrait photography",
+    "Two hands - one young, one elderly - clasped together in prayer, warm golden light, symbolic and moving, macro photography",
+    "A group of people on a hilltop at sunset raising their hands in worship, silhouettes against fiery sky, powerful image",
+    # Agua y naturaleza
+    "Crystal clear mountain stream with light filtering through pine trees, peaceful and spiritual, nature photography, stunning colors",
+    "A lighthouse on rocky cliffs during a dramatic storm, light cutting through darkness, symbolic of hope and guidance, epic photography",
+    "A lone tree standing on a hill against a stormy sky with a rainbow breaking through, resilience and hope, landscape photography",
+    "Sunbeams breaking through forest canopy onto a winding path, spiritual journey concept, dreamy atmospheric photography",
+    "A still lake at dawn reflecting mountains and golden sky perfectly, tranquility and reflection, mirror-like surface",
+    # Cielo y cosmos
+    "The Milky Way galaxy above a small chapel in the mountains at night, stars filling the sky, cosmic and spiritual, long exposure photography",
+    "Lightning storm over a desert landscape with a cross silhouette, power of God, dramatic photography, striking composition",
+    "Aurora borealis (northern lights) in brilliant green and purple over a snowy landscape, divine beauty, stunning photography",
+    "A full moon rising over a calm sea, golden path on water, peaceful and contemplative, night photography",
+    "Dramatic cumulus clouds forming a cathedral-like arch in the sky, sun rays breaking through, epic sky photography",
+    # Símbolos religiosos
+    "An ornate golden cross in an ancient cathedral with light streaming through rose windows, sacred architecture, wide angle photography",
+    "Open Bible on a rustic wooden surface with a small plant growing nearby, new life and scripture, still life photography",
+    "A rosary laid on an old stone surface with a single flower, delicate and devotional, macro photography, warm tones",
+    "Church bells silhouetted against a golden sunset sky, calling to prayer, atmospheric silhouette photography",
+    "A simple wooden cross on a beach at low tide, reflection in wet sand, serene and powerful, minimalist photography"
+]
+
+def generar_prompt_imagen(pain_point):
+    """Genera un prompt de imagen variado y cinematografico"""
+    import random
+    # Elegir escena aleatoria
+    escena = random.choice(ESCENAS_RELIGIOSAS)
+    return escena
+
 def generar_imagen(image_prompt):
     """Genera imagen con Replicate usando REST API directamente (sin SDK)"""
     headers = {
@@ -275,9 +321,9 @@ def generar_voz(texto):
     from gtts import gTTS
     # Limpiar markdown antes de leer en voz alta
     texto_limpio = texto
-    texto_limpio = re.sub(r'\*\*(.+?)\*\*', r'\1', texto_limpio)  # **negrita** → negrita
-    texto_limpio = re.sub(r'\*(.+?)\*', r'\1', texto_limpio)        # *italica* → italica
-    texto_limpio = re.sub(r'#{1,6}\s*', '', texto_limpio)             # ### Titulo → Titulo
+    texto_limpio = re.sub(r'\*\*(.+?)\*\*', r'\1', texto_limpio)  # **negrita** â negrita
+    texto_limpio = re.sub(r'\*(.+?)\*', r'\1', texto_limpio)        # *italica* â italica
+    texto_limpio = re.sub(r'#{1,6}\s*', '', texto_limpio)             # ### Titulo â Titulo
     texto_limpio = re.sub(r'\*+', '', texto_limpio)                   # asteriscos sueltos
     texto_limpio = re.sub(r'_+', '', texto_limpio)                     # guiones bajos
     texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()          # espacios multiples
@@ -318,7 +364,7 @@ def crear_video(image_data, audio_data):
     except Exception as e:
         print(f"  No se pudo obtener duracion, usando 30s: {e}")
 
-    # ffmpeg: imagen en loop + audio â video MP4 con fade in/out
+    # ffmpeg: imagen en loop + audio Ã¢ÂÂ video MP4 con fade in/out
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-i', img_path,
@@ -386,7 +432,7 @@ def main():
     print(f"Imagen: {len(image_data)} bytes")
     # Alternar aleatoriamente: 50% foto, 50% video
     usar_video = random.random() < 0.5
-    print(f"Modo: {'VIDEO ð¬' if usar_video else 'FOTO ð·'}")
+    print(f"Modo: {'VIDEO Ã°ÂÂÂ¬' if usar_video else 'FOTO Ã°ÂÂÂ·'}")
 
     if usar_video:
         print("Generando voz con gTTS...")
